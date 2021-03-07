@@ -1,0 +1,102 @@
+import cv2 #for image processing
+import easygui #to open the filebox
+import numpy as np #to store image
+import imageio #to read image stored at particular path
+
+import sys
+import matplotlib.pyplot as plt
+import os
+import tkinter as tk
+from tkinter import filedialog
+from tkinter import *
+from tkinter import messagebox 
+from PIL import ImageTk, Image
+top=tk.Tk()
+top.geometry('800x600')
+top.title('Cartoonize your image!')
+top.configure(background='Black')
+label=Label(top,background='White', font=('times',30,'bold italic'))
+def upload():
+    ImagePath=easygui.fileopenbox()
+    cartoonify(ImagePath)
+def cartoonify(ImagePath):
+    # Reading the Image 
+    image = cv2.imread(ImagePath)
+    dimensions = image.shape
+    cv2.imshow('OriginalImage', image)
+    cv2.waitKey()   
+    cv2.destroyAllWindows()
+    
+    #Finding the Edges of Image
+    gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY) 
+    gray = cv2.medianBlur(gray, 7) 
+    edges = cv2.adaptiveThreshold(gray, 255, cv2.ADAPTIVE_THRESH_MEAN_C, cv2.THRESH_BINARY, 9, 10)
+    BWSketch, ColorSketch  = cv2.pencilSketch(image, sigma_s=60, sigma_r=0.5, shade_factor=0.01)
+    
+    #Displaying the pencil sketch of Image
+    BWSketch=cv2.resize(BWSketch, (dimensions[1],dimensions[0]))
+    ColorSketch=cv2.resize(ColorSketch, (dimensions[1],dimensions[0]))
+    cv2.imshow('BWSketch', BWSketch)  
+    cv2.waitKey()   
+    cv2.destroyAllWindows()
+    
+    # Making a rough Cartoon of the image
+    color = cv2.bilateralFilter(image, 12, 250, 250) 
+    BasicCartoon = cv2.bitwise_and(color, color, mask=edges)
+    BasicCartoon=cv2.resize(BasicCartoon, (dimensions[1],dimensions[0]))
+    cv2.imshow('BasicCartoon', BasicCartoon)   
+    cv2.waitKey()   
+    cv2.destroyAllWindows()
+    
+    #converting to gray scale
+    grayImage = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+    #applying gaussian blur
+    grayImage = cv2.GaussianBlur(grayImage, (3, 3), 0)
+    #detecting edges
+    edgeImage = cv2.Laplacian(grayImage, -1, ksize=5)
+    edgeImage = 255 - edgeImage
+    #threshold image
+    ret, edgeImage = cv2.threshold(edgeImage, 150, 255, cv2.THRESH_BINARY)
+    #blur images heavily using edgePreservingFilter
+    edgePreservingImage = cv2.edgePreservingFilter(image, flags=2, sigma_s=50, sigma_r=0.4)
+    #create output matrix
+    output =np.zeros(grayImage.shape)
+    
+    # Displaying a restyled Image
+    StyledCartoon = cv2.stylization(image, sigma_s=150, sigma_r=0.05)
+    StyledCartoon=cv2.resize(StyledCartoon, (dimensions[1],dimensions[0]))
+    cv2.imshow('StyledCartoon', StyledCartoon)  
+    cv2.waitKey()   
+    cv2.destroyAllWindows()
+    
+    #combine cartoon image and edges image
+    CartoonizedImage = cv2.bitwise_and(edgePreservingImage, edgePreservingImage, mask=edgeImage)
+    CartoonizedImage=cv2.resize(CartoonizedImage, (dimensions[1],dimensions[0]))
+    
+    # Saving the final Image
+    save1=Button(top,text="Save the cartoonized image",command=lambda: save(StyledCartoon, ImagePath),padx=30,pady=5)
+    save1.configure(background='white', foreground='red',font=('helvetica',15,'bold'))
+    save1.pack(side=TOP,pady=50)
+    
+    # Dispalying the Cartoonized Image
+    cv2.imshow('CartoonizedImage', CartoonizedImage)    
+    cv2.waitKey()    
+    cv2.destroyAllWindows()
+    
+    # Click to Quit
+    button = tk.Button(text = "Click and Quit", command = top.destroy)
+    button.pack()
+def save(StyledCartoon, ImagePath):
+    #saving an image using imwrite()
+    newName="cartoonified_Image"
+    path1 = os.path.dirname(ImagePath)
+    extension=os.path.splitext(ImagePath)[1]
+    path = os.path.join(path1, newName+extension)
+    cv2.imwrite(path, cv2.cvtColor(CartoonizedImage, cv2.COLOR_RGB2BGR))
+    I= "Image saved by name " + newName +" at "+ path
+    messagebox.showinfo("showinfo", I) 
+upload=Button(top,text="Select your Image",command=upload,padx=20,pady=15)
+upload.configure(background='white', foreground='red',font=('helvetica',15,'bold'))
+upload.pack(side=TOP,pady=50)
+
+top.mainloop()
